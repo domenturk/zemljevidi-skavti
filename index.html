@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skavtske karte</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+    <!-- Application CSS -->
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+    <!-- Top toolbar -->
+    <header class="toolbar">
+        <h1 class="app-title">Skavtske karte</h1>
+        <div class="toolbar-buttons">
+            <button id="btn-import" title="Uvozi GeoJSON">
+                <span class="icon">📂</span> Uvozi
+            </button>
+            <button id="btn-export" title="Izvozi GeoJSON">
+                <span class="icon">💾</span> Izvozi
+            </button>
+            <button id="btn-delete-last" title="Izbriši zadnje">
+                <span class="icon">↩️</span> Razveljavi
+            </button>
+            <button id="btn-delete-all" title="Izbriši vse">
+                <span class="icon">🗑️</span> Izbriši vse
+            </button>
+            <button id="btn-print" title="Natisni">
+                <span class="icon">🖨️</span> Natisni
+            </button>
+        </div>
+        <input type="file" id="file-input" accept=".geojson,.json" style="display: none;" />
+    </header>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <!-- Left sidebar - Drawing tools -->
+        <aside class="sidebar sidebar-left">
+            <h2>Orodja</h2>
+            <div class="tool-group">
+                <button class="tool-btn active" data-tool="move" title="Premikanje">
+                    <span class="icon">✋</span> Premikanje
+                </button>
+                <button class="tool-btn" data-tool="measure" title="Merjenje razdalje">
+                    <span class="icon">📏</span> Merjenje
+                </button>
+                <button class="tool-btn" data-tool="marker" title="Dodaj točko">
+                    <span class="icon">📍</span> Dodaj točko
+                </button>
+                <button class="tool-btn" data-tool="polyline" title="Nariši pot">
+                    <span class="icon">〰️</span> Nariši pot
+                </button>
+                <button class="tool-btn" data-tool="polygon" title="Nariši območje">
+                    <span class="icon">⬡</span> Nariši območje
+                </button>
+                <button class="tool-btn" data-tool="text" title="Dodaj besedilo">
+                    <span class="icon">🔤</span> Dodaj besedilo
+                </button>
+            </div>
+
+            <div class="style-options" id="style-options" style="display: none;">
+                <h3>Slog</h3>
+                <div class="style-row">
+                    <label for="stroke-color">Barva:</label>
+                    <input type="color" id="stroke-color" value="#3388ff" />
+                </div>
+                <div class="style-row">
+                    <label for="stroke-width">Debelina:</label>
+                    <input type="range" id="stroke-width" min="1" max="10" value="3" />
+                    <span id="stroke-width-value">3</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map container -->
+        <div id="map"></div>
+
+        <!-- Right sidebar - Layers -->
+        <aside class="sidebar sidebar-right">
+            <h2>Plasti</h2>
+
+            <div class="layer-group">
+                <h3>Osnovne plasti</h3>
+                <label class="layer-option">
+                    <input type="radio" name="base-layer" value="osm" checked />
+                    OpenStreetMap
+                </label>
+                <label class="layer-option">
+                    <input type="radio" name="base-layer" value="otm" />
+                    OpenTopoMap
+                </label>
+                <label class="layer-option">
+                    <input type="radio" name="base-layer" value="outdoors" />
+                    Outdoors (Topo)
+                </label>
+                <label class="layer-option">
+                    <input type="radio" name="base-layer" value="esriTopo" />
+                    ESRI Topo
+                </label>
+                <label class="layer-option">
+                    <input type="radio" name="base-layer" value="esriSat" />
+                    Satelit
+                </label>
+            </div>
+
+            <div class="layer-group">
+                <h3>Prekrivne plasti</h3>
+                <label class="layer-option">
+                    <input type="checkbox" id="overlay-hiking" />
+                    Planinske poti
+                </label>
+                <small class="layer-source">Vir: <a href="https://waymarkedtrails.org" target="_blank">Waymarked Trails</a></small>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal for point input -->
+    <div class="modal" id="point-modal">
+        <div class="modal-content">
+            <h2>Dodaj točko</h2>
+            <div class="form-group">
+                <label for="point-style">Oznaka:</label>
+                <select id="point-style" class="style-select">
+                    <option value="default">📍 Privzeto</option>
+                    <option value="camp">⛺ Tabor</option>
+                    <option value="flag">🚩 Zastava</option>
+                    <option value="star">⭐ Zvezda</option>
+                    <option value="info">ℹ️ Info</option>
+                    <option value="warning">⚠️ Opozorilo</option>
+                    <option value="water">💧 Voda</option>
+                    <option value="food">🍽️ Hrana</option>
+                    <option value="shelter">🏠 Zavetje</option>
+                    <option value="tree">🌲 Drevo</option>
+                    <option value="mountain">⛰️ Gora</option>
+                    <option value="fire">🔥 Ogenj</option>
+                    <option value="cross">✝️ Križ</option>
+                    <option value="circle">⚫ Krog</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="point-name">Ime:</label>
+                <input type="text" id="point-name" placeholder="Ime točke" />
+            </div>
+            <div class="form-group">
+                <label for="point-description">Opis:</label>
+                <textarea id="point-description" placeholder="Opis točke"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="point-coords">Koordinate:</label>
+                <input type="text" id="point-coords" placeholder="46.0514, 14.5069" readonly />
+                <small class="help-text">
+                    Koordinate so določene s klikom na karto.
+                </small>
+            </div>
+            <div class="modal-buttons">
+                <button id="point-cancel" class="btn-secondary">Prekliči</button>
+                <button id="point-confirm" class="btn-primary">Dodaj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for text input -->
+    <div class="modal" id="text-modal">
+        <div class="modal-content">
+            <h2>Dodaj besedilo</h2>
+            <div class="form-group">
+                <label for="text-content">Besedilo:</label>
+                <input type="text" id="text-content" placeholder="Vnesite besedilo" />
+            </div>
+            <div class="form-group">
+                <label for="text-coords">Koordinate:</label>
+                <input type="text" id="text-coords" placeholder="46.0514, 14.5069" readonly />
+            </div>
+            <div class="modal-buttons">
+                <button id="text-cancel" class="btn-secondary">Prekliči</button>
+                <button id="text-confirm" class="btn-primary">Dodaj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print elements -->
+    <div class="print-legend" id="print-legend">
+        <h3>Legenda</h3>
+        <div id="legend-content"></div>
+    </div>
+
+    <div class="print-north-arrow" id="print-north-arrow">
+        <div class="north-arrow">
+            <div class="arrow">▲</div>
+            <div class="label">S</div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw JS -->
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+    <!-- Application JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>
